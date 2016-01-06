@@ -40,16 +40,21 @@ public class HDFSPanel extends ServerPanel {
 
     private JTextField serverField;
     private JTextField usernameField;
-//    private JTextField groupField;
     private JTextField initialDirField;
     private JSpinner portSpinner;
+    private JCheckBox useKerberosCheckBox;
+    private JTextField realmField;
+    private JCheckBox useOSTicketCheckBox;
+    private JPasswordField passwordField;
 
     private static String lastServer = "";
     private static String lastUsername = HDFSFile.getDefaultUsername();
-//    private static String lastGroup = HDFSFile.getDefaultGroup();
     private static String lastInitialDir = "/";
     private static int lastPort = FileURL.getRegisteredHandler(FileProtocols.HDFS).getStandardPort();
-
+    private static String lastRealm = ""; //TODO:might want to read the realm from KRB5 login module
+    private static boolean usedKerberos = false; //TODO: read from perfs 
+    private static boolean usedOSTicket = false; //TODO: read from prefs
+    private static String lastPassword ="";
 
     HDFSPanel(ServerConnectDialog dialog, final MainFrame mainFrame) {
         super(dialog, mainFrame);
@@ -66,7 +71,7 @@ public class HDFSPanel extends ServerPanel {
         addTextFieldListeners(usernameField, false);
         addRow(Translator.get("server_connect_dialog.username"), usernameField, 15);
 
-//        // Password field, initialized to ""
+        // Password field, initialized to ""
 //        groupField = new JTextField(lastGroup);
 //        groupField.selectAll();
 //        addTextFieldListeners(groupField, false);
@@ -81,15 +86,47 @@ public class HDFSPanel extends ServerPanel {
         // Port field, initialized to last port
         portSpinner = createPortSpinner(lastPort);
         addRow(Translator.get("server_connect_dialog.port"), portSpinner, 15);
+
+	//useKerberos checkbox
+	useKerberosCheckBox = new JCheckBox();
+        useKerberosCheckBox.setSelected(usedKerberos);
+        addRow(Translator.get("server_connect_dialog.use_kerberos"),  useKerberosCheckBox , 15);
+
+	//realm field
+	realmField = new JTextField(lastRealm);
+        realmField.selectAll();
+        addTextFieldListeners(realmField, false);
+        addRow(Translator.get("server_connect_dialog.realm"), realmField, 15);
+
+	//useOSTicket checkbox
+	useOSTicketCheckBox = new JCheckBox();
+        useOSTicketCheckBox.setSelected(usedKerberos);
+        addRow(Translator.get("server_connect_dialog.use_os_ticket"),  useOSTicketCheckBox , 15);
+
+	//password field
+	passwordField = new JPasswordField();
+        passwordField.selectAll();
+        addTextFieldListeners(passwordField, false);
+        addRow(Translator.get("server_connect_dialog.passphrase"), passwordField, 15);
+	
     }
 
 
     private void updateValues() {
         lastServer = serverField.getText();
         lastUsername = usernameField.getText();
-//        lastGroup = groupField.getText();
         lastInitialDir = initialDirField.getText();
-        lastPort = (Integer) portSpinner.getValue();
+        
+	usedKerberos = useKerberosCheckBox.isSelected();	
+
+	if(usedKerberos)
+	{
+		lastRealm = realmField.getText();
+		usedOSTicket = useOSTicketCheckBox.isSelected();	
+		if(usedOSTicket)
+			lastPassword = passwordField.getText();	
+	}
+
     }
 
 
@@ -105,12 +142,19 @@ public class HDFSPanel extends ServerPanel {
 
         FileURL url = FileURL.getFileURL(FileProtocols.HDFS+"://"+lastServer+lastInitialDir);
 
-        // Set user and group
-        url.setCredentials(new Credentials(lastUsername, ""));
-//        url.setProperty(HDFSFile.GROUP_PROPERTY_NAME, lastGroup);
-
         // Set port
         url.setPort(lastPort);
+
+	url.setProperty(HDFSFile.USE_KERBEROS, (usedKerberos==true) ?"true":"false");
+
+	if(usedKerberos)
+	{
+		url.setProperty(HDFSFile.USE_OS_TICKET, (usedOSTicket==true)?"true":"false");
+		url.setProperty(HDFSFile.KERBEROS_REALM, lastRealm.toString());
+	}
+	
+        url.setCredentials(new Credentials(lastUsername, lastPassword));
+
 
         return url;
     }
